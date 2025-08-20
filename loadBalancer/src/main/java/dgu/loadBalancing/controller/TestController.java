@@ -1,137 +1,154 @@
 package dgu.loadBalancing.controller;
 
-import io.swagger.v3.oas.annotations.*;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.tags.Tag;
+import dgu.loadBalancing.model.Server;
+import dgu.loadBalancing.strategy.*;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.time.LocalDateTime;
+import java.util.*;
+import java.util.stream.Collectors;
 
-/**
- * 로드밸런서 테스트용 컨트롤러
- */
 @RestController
-@RequestMapping("/test")
-@Tag(name = "Test", description = "로드밸런서 테스트 API")
+@RequestMapping("/api/server")
 public class TestController {
 
-    /**
-     * Round Robin 테스트
-     */
-    @Operation(
-        summary = "Round Robin 알고리즘 테스트", 
-        description = "Round Robin 알고리즘으로 여러 번 요청을 보내서 순차적 분배를 확인합니다."
-    )
-    @Parameter(name = "count", description = "요청 횟수", example = "10")
-    @GetMapping("/round-robin")
-    public ResponseEntity<Map<String, Object>> testRoundRobin(
-            @RequestParam(defaultValue = "10") int count) {
-        
-        Map<String, Object> result = new HashMap<>();
-        result.put("algorithm", "Round Robin");
-        result.put("testCount", count);
-        result.put("description", "Round Robin 알고리즘 테스트를 위해 /api/?algorithm=roundRobin 으로 " + count + "번 요청하세요.");
-        result.put("expectedPattern", "server-1 → server-2 → server-3 → server-4 → server-1 (순환)");
-        
-        return ResponseEntity.ok(result);
+    @Autowired
+    private List<Server> backendServers;
+
+    private final Map<String, LoadBalancingStrategy> strategies;
+
+    public TestController() {
+        // 사용 가능한 전략들 초기화
+        strategies = new HashMap<>();
+        strategies.put("ROUND_ROBIN", new RoundRobinStrategy());
+        strategies.put("WEIGHTED_ROUND_ROBIN", new WeightedRoundRobinStrategy());
+        strategies.put("LEAST_CONNECTIONS", new LeastConnectionsStrategy());
+        strategies.put("LEAST_RESPONSE_TIME", new LeastResponseTimeStrategy());
+        strategies.put("IP_HASH", new IpHashStrategy());
+        strategies.put("CONSISTENT_HASHING", new ConsistentHashingStrategy());
     }
 
-    /**
-     * Weighted Round Robin 테스트
-     */
-    @Operation(
-        summary = "Weighted Round Robin 알고리즘 테스트", 
-        description = "Weighted Round Robin 알고리즘으로 가중치 기반 분배를 확인합니다."
-    )
-    @Parameter(name = "count", description = "요청 횟수", example = "20")
-    @GetMapping("/weighted-round-robin")
-    public ResponseEntity<Map<String, Object>> testWeightedRoundRobin(
-            @RequestParam(defaultValue = "20") int count) {
-        
-        Map<String, Object> result = new HashMap<>();
-        result.put("algorithm", "Weighted Round Robin");
-        result.put("testCount", count);
-        result.put("description", "Weighted Round Robin 알고리즘 테스트를 위해 /api/?algorithm=weightedRoundRobin 으로 " + count + "번 요청하세요.");
-        result.put("expectedRatio", "server-1(40%) : server-2(30%) : server-3(20%) : server-4(10%)");
-        
-        return ResponseEntity.ok(result);
+    @GetMapping
+    public ResponseEntity<Map<String, Object>> handleRequest(
+            @RequestParam(defaultValue = "ROUND_ROBIN") String algorithm,
+            @RequestParam(required = false) String clientId,
+            @RequestParam(required = false) String clientIp) {
+
+        try {
+            // 1. 알고리즘 검증
+            if (!strategies.containsKey(algorithm.toUpperCase())) {
+                return ResponseEntity.badRequest().body(
+                    Map.of("error", "지원하지 않는 알고리즘입니다. 사용 가능한 알고리즘: " + 
+                           String.join(", ", strategies.keySet()))
+                );
+            }
+
+            // 2. 건강한 서버들만 필터링
+            List<Server> healthyServers = backendServers.stream()
+                    .filter(Server::isHealthy)
+                    .collect(Collectors.toList());
+
+            if (healthyServers.isEmpty()) {
+                return ResponseEntity.status(503).body(
+                    Map.of("error", "사용 가능한 서버가 없습니다.")
+                );
+            }
+
+            // 3. 전략에 따라 서버 선택
+            LoadBalancingStrategy strategy = strategies.get(algorithm.toUpperCase());
+            String clientInfo = clientId != null ? clientId : 
+                               (clientIp != null ? clientIp : "anonymous");
+            
+            Server selectedServer = strategy.selectServer(healthyServers, clientInfo);
+
+            // 4. 서버 메트릭 시뮬레이션 (실제로는 서버에 요청을 보내고 응답시간 측정)
+            selectedServer.incrementConnections();
+            long responseTime = simulateServerRequest(selectedServer);
+            selectedServer.recordResponseTime(responseTime);
+            selectedServer.decrementConnections();
+
+            // 5. 응답 구성
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "요청이 성공적으로 처리되었습니다");
+            
+            Map<String, Object> serverInfo = new HashMap<>();
+            serverInfo.put("id", selectedServer.getId());
+            serverInfo.put("url", selectedServer.getUrl());
+            serverInfo.put("weight", selectedServer.getWeight());
+            serverInfo.put("currentConnections", selectedServer.getCurrentConnections());
+            serverInfo.put("totalRequests", selectedServer.getTotalRequests());
+            serverInfo.put("averageResponseTime", String.format("%.2f ms", selectedServer.getAverageResponseTime()));
+            
+            response.put("selectedServer", serverInfo);
+            response.put("algorithm", algorithm.toUpperCase());
+            response.put("clientInfo", clientInfo);
+            response.put("timestamp", LocalDateTime.now());
+            response.put("responseTime", responseTime + " ms");
+
+            return ResponseEntity.ok()
+                    .header("X-Selected-Server", selectedServer.getId())
+                    .header("X-Load-Balancer", "Active")
+                    .header("X-Algorithm", algorithm.toUpperCase())
+                    .body(response);
+
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(
+                Map.of("error", "서버 선택 중 오류가 발생했습니다: " + e.getMessage())
+            );
+        }
     }
 
-    /**
-     * IP Hash 테스트
-     */
-    @Operation(
-        summary = "IP Hash 알고리즘 테스트", 
-        description = "IP Hash 알고리즘으로 같은 클라이언트가 같은 서버로 가는지 확인합니다."
-    )
-    @Parameter(name = "clientIp", description = "테스트할 클라이언트 IP", example = "192.168.1.100")
-    @GetMapping("/ip-hash")
-    public ResponseEntity<Map<String, Object>> testIpHash(
-            @RequestParam(defaultValue = "192.168.1.100") String clientIp) {
-        
-        Map<String, Object> result = new HashMap<>();
-        result.put("algorithm", "IP Hash");
-        result.put("clientIp", clientIp);
-        result.put("description", "IP Hash 알고리즘 테스트를 위해 X-Forwarded-For 헤더를 " + clientIp + "로 설정하여 /api/?algorithm=ipHash 로 여러 번 요청하세요.");
-        result.put("expectedBehavior", "같은 IP에서 오는 모든 요청은 항상 같은 서버로 라우팅됩니다.");
-        result.put("curlExample", "curl -H \"X-Forwarded-For: " + clientIp + "\" \"http://localhost:8080/api/?algorithm=ipHash\"");
-        
-        return ResponseEntity.ok(result);
+    @GetMapping("/status")
+    public ResponseEntity<Map<String, Object>> getServerStatus() {
+        List<Map<String, Object>> serverStatuses = backendServers.stream()
+                .map(server -> {
+                    Map<String, Object> serverInfo = new HashMap<>();
+                    serverInfo.put("id", server.getId());
+                    serverInfo.put("url", server.getUrl());
+                    serverInfo.put("healthy", server.isHealthy());
+                    serverInfo.put("weight", server.getWeight());
+                    serverInfo.put("currentConnections", server.getCurrentConnections());
+                    serverInfo.put("totalRequests", server.getTotalRequests());
+                    serverInfo.put("averageResponseTime", String.format("%.2f ms", server.getAverageResponseTime()));
+                    return serverInfo;
+                })
+                .collect(Collectors.toList());
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("servers", serverStatuses);
+        response.put("availableAlgorithms", strategies.keySet());
+        response.put("timestamp", LocalDateTime.now());
+
+        return ResponseEntity.ok(response);
     }
 
-    /**
-     * 모든 알고리즘 성능 비교 테스트
-     */
-    @Operation(
-        summary = "전체 알고리즘 성능 비교", 
-        description = "모든 로드밸런싱 알고리즘의 성능을 비교하기 위한 테스트 가이드를 제공합니다."
-    )
-    @GetMapping("/performance")
-    public ResponseEntity<Map<String, Object>> performanceTest() {
-        
-        Map<String, Object> result = new HashMap<>();
-        result.put("title", "로드밸런싱 알고리즘 성능 비교 테스트");
-        
-        Map<String, String> algorithms = new HashMap<>();
-        algorithms.put("roundRobin", "/api/?algorithm=roundRobin");
-        algorithms.put("weightedRoundRobin", "/api/?algorithm=weightedRoundRobin");
-        algorithms.put("leastConnections", "/api/?algorithm=leastConnections");
-        algorithms.put("consistentHashing", "/api/?algorithm=consistentHashing");
-        algorithms.put("ipHash", "/api/?algorithm=ipHash");
-        algorithms.put("leastResponseTime", "/api/?algorithm=leastResponseTime");
-        
-        result.put("endpoints", algorithms);
-        result.put("testCommand", "ab -n 100 -c 10 'http://localhost:8080/api/?algorithm=roundRobin'");
-        result.put("description", "Apache Bench(ab)를 사용하여 각 알고리즘별로 부하 테스트를 실행하세요.");
-        
-        return ResponseEntity.ok(result);
+    @GetMapping("/algorithms")
+    public ResponseEntity<Map<String, Object>> getAvailableAlgorithms() {
+        Map<String, String> algorithmDescriptions = new HashMap<>();
+        strategies.forEach((name, strategy) -> 
+            algorithmDescriptions.put(name, strategy.getDescription())
+        );
+
+        return ResponseEntity.ok(Map.of(
+            "algorithms", algorithmDescriptions,
+            "usage", "GET /api/server?algorithm={ALGORITHM_NAME}&clientId={CLIENT_ID}"
+        ));
     }
 
-    /**
-     * 장애 시나리오 테스트
-     */
-    @Operation(
-        summary = "장애 시나리오 테스트", 
-        description = "서버 장애 상황에서의 로드밸런서 동작을 테스트하기 위한 가이드를 제공합니다."
-    )
-    @GetMapping("/failure")
-    public ResponseEntity<Map<String, Object>> failureTest() {
+    // 서버 요청 시뮬레이션 (실제로는 WebClient로 백엔드 서버에 요청)
+    private long simulateServerRequest(Server server) {
+        // 서버별 가중치에 따른 응답시간 시뮬레이션
+        Random random = new Random();
+        int baseTime = switch (server.getWeight()) {
+            case 4 -> 50;   // 고성능 서버
+            case 3 -> 100;  // 보통 성능
+            case 2 -> 150;  // 낮은 성능
+            default -> 200; // 매우 낮은 성능
+        };
         
-        Map<String, Object> result = new HashMap<>();
-        result.put("title", "장애 시나리오 테스트");
-        
-        Map<String, String> steps = new HashMap<>();
-        steps.put("step1", "POST /dashboard/servers/server-4/toggle - server-4 수동 다운");
-        steps.put("step2", "GET /dashboard/servers - 서버 상태 확인");
-        steps.put("step3", "GET /api/?algorithm=roundRobin - 3개 서버로만 분배되는지 확인");
-        steps.put("step4", "POST /dashboard/servers/server-4/toggle - server-4 복구");
-        steps.put("step5", "GET /api/?algorithm=roundRobin - 4개 서버로 다시 분배되는지 확인");
-        
-        result.put("testSteps", steps);
-        result.put("description", "위 단계를 순서대로 실행하여 장애 복구 시나리오를 테스트하세요.");
-        
-        return ResponseEntity.ok(result);
+        return baseTime + random.nextInt(50); // ±25ms 변동
     }
 }
