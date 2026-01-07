@@ -1,5 +1,8 @@
 package dgu.loadBalancing.model;
 
+import lombok.Getter;
+import lombok.Setter;
+
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.LinkedList;
@@ -8,12 +11,16 @@ import java.util.Queue;
 /**
  * 로드밸런싱 대상 서버를 나타내는 모델 클래스
  */
+@Getter
 public class Server {
     private final String id;
     private final String host;
     private final int port;
     private final String url;
+    // Setters
+    @Setter
     private boolean healthy;
+    @Setter
     private int weight;
     
     // 실시간 메트릭
@@ -68,20 +75,9 @@ public class Server {
         }
     }
     
-    // Getters
-    public String getId() { return id; }
-    public String getHost() { return host; }
-    public int getPort() { return port; }
-    public String getUrl() { return url; }
-    public boolean isHealthy() { return healthy; }
-    public int getWeight() { return weight; }
     public int getCurrentConnections() { return currentConnections.get(); }
     public long getTotalRequests() { return totalRequests.get(); }
-    
-    // Setters
-    public void setHealthy(boolean healthy) { this.healthy = healthy; }
-    public void setWeight(int weight) { this.weight = weight; }
-    
+
     @Override
     public String toString() {
         return String.format("Server{id='%s', url='%s', healthy=%s, connections=%d, avgResponseTime=%.2fms}", 

@@ -41,14 +41,14 @@ public class WeightedRoundRobinStrategy implements LoadBalancingStrategy {
         if (weightedServerList.isEmpty()) {
             throw new IllegalStateException("가중치 서버 리스트가 비어있습니다.");
         }
-        
-        int index = currentIndex.getAndIncrement() % weightedServerList.size();
-        Server selectedServer = weightedServerList.get(index);
-        
+
+        List<Server> snapshot = weightedServerList;
+        int index = currentIndex.getAndIncrement() % snapshot.size();
+        Server server = snapshot.get(index);
         // 연결 수 증가
-        selectedServer.incrementConnections();
+        server.incrementConnections();
         
-        return selectedServer;
+        return server;
     }
     
     @Override
