@@ -6,6 +6,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * Consistent Hashing 로드밸런싱 전략
@@ -15,61 +16,50 @@ import java.util.concurrent.ConcurrentSkipListMap;
 public class ConsistentHashingStrategy implements LoadBalancingStrategy {
     
     private static final int VIRTUAL_NODES = 150; // 가상 노드 수 (핫스팟 방지)
-    private final ConcurrentSkipListMap<Long, Server> hashRing = new ConcurrentSkipListMap<>();
-    private final MessageDigest md5;
-    private volatile boolean ringInitialized = false;
-    
-    public ConsistentHashingStrategy() {
+    private static final ThreadLocal<MessageDigest> MD5_HOLDER = ThreadLocal.withInitial(() -> {
         try {
-            this.md5 = MessageDigest.getInstance("MD5");
+            return MessageDigest.getInstance("MD5");
         } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("MD5 해시 알고리즘을 찾을 수 없습니다.", e);
+            throw new RuntimeException(e);
         }
-    }
-    
+    });
+
+    // 2. volatile 참조로 원자적 교체 (Copy-on-Write 패턴)
+    private volatile ConcurrentSkipListMap<Long, Server> hashRing = new ConcurrentSkipListMap<>();
+
+    // 3. 초기화 동기화를 위한 락
+    private final ReentrantReadWriteLock ringLock = new ReentrantReadWriteLock();
+    private volatile boolean ringInitialized = false;
+
+
     @Override
     public void initialize(List<Server> servers) {
         buildHashRing(servers);
     }
-    
-    @Override
+
     public Server selectServer(List<Server> servers, String clientInfo) {
-        if (servers == null || servers.isEmpty()) {
-            throw new IllegalArgumentException("서버 목록이 비어있습니다.");
+
+        // fast-path (락 없음)
+        if (!ringInitialized || needsRebuild(servers)) {
+            rebuildIfNeeded(servers);
         }
-        
-        if (clientInfo == null || clientInfo.trim().isEmpty()) {
-            clientInfo = "unknown-client-" + System.currentTimeMillis();
-        }
-        
-        // 해시 링이 초기화되지 않았거나 서버 목록이 변경된 경우 재구성
+
+        ConcurrentSkipListMap<Long, Server> currentRing = this.hashRing;
+        long clientHash = hash(clientInfo);
+
+        Map.Entry<Long, Server> entry = currentRing.ceilingEntry(clientHash);
+        if (entry == null) entry = currentRing.firstEntry();
+
+        return entry.getValue();
+    }
+
+    private synchronized void rebuildIfNeeded(List<Server> servers) {
+        // slow-path: 동기화
         if (!ringInitialized || needsRebuild(servers)) {
             buildHashRing(servers);
         }
-        
-        if (hashRing.isEmpty()) {
-            throw new IllegalStateException("사용 가능한 건강한 서버가 없습니다.");
-        }
-        
-        // 클라이언트 정보의 해시값 계산
-        long clientHash = hash(clientInfo);
-        
-        // 해시 링에서 시계방향으로 가장 가까운 서버 찾기
-        Map.Entry<Long, Server> entry = hashRing.ceilingEntry(clientHash);
-        if (entry == null) {
-            // 링의 끝에 도달하면 처음부터 시작
-            entry = hashRing.firstEntry();
-        }
-        
-        Server selectedServer = entry.getValue();
-        selectedServer.incrementConnections();
-        
-        System.out.printf("[Consistent Hashing] 클라이언트: %s (hash: %d) → 서버: %s%n", 
-                clientInfo, clientHash, selectedServer.getId());
-        
-        return selectedServer;
     }
-    
+
     @Override
     public void updateServerMetrics(Server server, long responseTime, boolean success) {
         server.decrementConnections();
@@ -105,22 +95,27 @@ public class ConsistentHashingStrategy implements LoadBalancingStrategy {
      * 해시 링 구성
      */
     private void buildHashRing(List<Server> servers) {
-        hashRing.clear();
-        
+        // 새 링을 별도로 구성 (기존 링은 그대로 서비스 중)
+        ConcurrentSkipListMap<Long, Server> newRing = new ConcurrentSkipListMap<>();
+
         List<Server> healthyServers = servers.stream()
                 .filter(Server::isHealthy)
                 .toList();
-        
+
         for (Server server : healthyServers) {
-            addServerToRing(server);
+            for (int i = 0; i < VIRTUAL_NODES; i++) {
+                String virtualNodeKey = server.getId() + "#" + i;
+                long hash = hash(virtualNodeKey);
+                newRing.put(hash, server);
+            }
         }
-        
-        ringInitialized = true;
-        
-        System.out.printf("[Consistent Hashing] 해시 링 구성 완료: %d개 서버, %d개 가상 노드%n", 
-                healthyServers.size(), hashRing.size());
+
+        // 원자적으로 교체 (Copy-on-Write)
+        this.hashRing = newRing;
+        this.ringInitialized = true;
     }
-    
+
+
     /**
      * 서버를 해시 링에 추가 (가상 노드 포함)
      */
@@ -160,19 +155,17 @@ public class ConsistentHashingStrategy implements LoadBalancingStrategy {
      * 문자열의 MD5 해시값을 long으로 변환
      */
     private long hash(String input) {
-        synchronized (md5) {
-            md5.reset();
-            md5.update(input.getBytes());
-            byte[] digest = md5.digest();
-            
-            // 바이트 배열을 long으로 변환 (8바이트만 사용)
-            long hash = 0;
-            for (int i = 0; i < 8; i++) {
-                hash = (hash << 8) | (digest[i] & 0xFF);
-            }
-            
-            return Math.abs(hash); // 양수로 변환
+        // ThreadLocal이라 동기화 불필요
+        MessageDigest md5 = MD5_HOLDER.get();
+        md5.reset();
+        md5.update(input.getBytes());
+        byte[] digest = md5.digest();
+
+        long hash = 0;
+        for (int i = 0; i < 8; i++) {
+            hash = (hash << 8) | (digest[i] & 0xFF);
         }
+        return Math.abs(hash);
     }
     
     /**
