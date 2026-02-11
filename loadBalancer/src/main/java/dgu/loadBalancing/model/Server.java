@@ -28,6 +28,7 @@ public class Server {
     private final AtomicLong totalRequests;
     private final Queue<Long> recentResponseTimes; // 최근 10개 응답시간
     private final Object responseTimeLock = new Object();
+    private final AtomicInteger connections = new AtomicInteger(0);
     
     public Server(String id, String host, int port) {
         this.id = id;
@@ -74,7 +75,12 @@ public class Server {
                     .orElse(Double.MAX_VALUE);
         }
     }
-    
+
+    public boolean tryIncrementConnections(int expected) {
+        return connections.compareAndSet(expected, expected + 1);
+    }
+
+
     public int getCurrentConnections() { return currentConnections.get(); }
     public long getTotalRequests() { return totalRequests.get(); }
 

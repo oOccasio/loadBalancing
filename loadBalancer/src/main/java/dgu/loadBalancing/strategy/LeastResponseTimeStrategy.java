@@ -138,48 +138,7 @@ public class LeastResponseTimeStrategy implements LoadBalancingStrategy {
         serverStats.computeIfAbsent(serverId, k -> new ResponseTimeStats())
                    .updateWeightedAverage(responseTime, ALPHA);
     }
-    
-    /**
-     * 모든 서버의 응답시간 현황 반환 (모니터링용)
-     */
-    public String getResponseTimeStatus(List<Server> servers) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("응답시간 현황: ");
-        
-        for (int i = 0; i < servers.size(); i++) {
-            Server server = servers.get(i);
-            double responseTime = getEffectiveResponseTime(server);
-            sb.append(String.format("%s:%.1fms", server.getId(), responseTime));
-            
-            if (i < servers.size() - 1) {
-                sb.append(", ");
-            }
-        }
-        
-        return sb.toString();
-    }
-    
-    /**
-     * 서버별 상세 통계 반환
-     */
-    public Map<String, ResponseTimeStats> getDetailedStats() {
-        return Map.copyOf(serverStats);
-    }
-    
-    /**
-     * 특정 서버의 통계 초기화 (테스트용)
-     */
-    public void resetServerStats(String serverId) {
-        serverStats.put(serverId, new ResponseTimeStats());
-    }
-    
-    /**
-     * 모든 서버 통계 초기화 (테스트용)
-     */
-    public void resetAllStats() {
-        serverStats.clear();
-    }
-    
+
     /**
      * 응답시간 통계를 관리하는 내부 클래스
      */
@@ -217,18 +176,6 @@ public class LeastResponseTimeStrategy implements LoadBalancingStrategy {
         
         public double getSimpleAverage() {
             return requestCount > 0 ? (double) totalResponseTime / requestCount : INITIAL_RESPONSE_TIME;
-        }
-        
-        public long getRequestCount() {
-            return requestCount;
-        }
-        
-        public long getTotalResponseTime() {
-            return totalResponseTime;
-        }
-        
-        public boolean isInitialized() {
-            return initialized;
         }
         
         @Override
