@@ -1,14 +1,40 @@
-# ?? ?? ??
-server.port=8080
-spring.application.name=load-balancer
+server:
+  tomcat:
+    threads:
+      max: 3000                # ?? ??? thread? ? ??
+      min-spare: 20           # ?? ??? ? thread? ??
+    max-connections: 8192     # connection? ? ??
+    accept-count: 3000         # ???? ???
+    connection-timeout: 20000 # timeout ?? ?? ??, 20?
 
-# ????? ??
-management.endpoints.web.exposure.include=health,info,metrics
-management.endpoint.health.show-details=always
+spring:
+  application:
+    name: load-balancer
 
-# ?? ??
-logging.level.dgu.loadBalancing=INFO
-logging.level.org.springframework.web.reactive.function.client=DEBUG
+# Actuator + Prometheus
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics, prometheus
+  endpoint:
+    health:
+      show-details: always
+    prometheus:
+      enabled: true
+  metrics:
+    distribution:
+      percentiles-histogram:
+        loadbalancer_response_time_seconds: true
+    tags:
+      application: ${spring.application.name}
 
-# Swagger ?? (????)
-springdoc.swagger-ui.path=/swagger-ui.html
+logging:
+  level:
+    dgu.loadBalancing: INFO
+    org.springframework.web.reactive.function.client: DEBUG
+
+# Swagger
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html

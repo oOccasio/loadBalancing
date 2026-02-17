@@ -8,66 +8,68 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.LinkedList;
 import java.util.Queue;
 
-/**
- * 로드밸런싱 대상 서버를 나타내는 모델 클래스
- */
 @Getter
 public class Server {
     private final String id;
-    private final String host;
-    private final int port;
     private final String url;
-    // Setters
+
     @Setter
-    private boolean healthy;
+    private volatile boolean healthy;
     @Setter
     private int weight;
-    
-    // 실시간 메트릭
+
     private final AtomicInteger currentConnections;
     private final AtomicLong totalRequests;
-    private final Queue<Long> recentResponseTimes; // 최근 10개 응답시간
+    private final Queue<Long> recentResponseTimes;
     private final Object responseTimeLock = new Object();
-    private final AtomicInteger connections = new AtomicInteger(0);
-    
-    public Server(String id, String host, int port) {
+
+    public Server(String id, String url) {
+        this(id, url, 1);
+    }
+
+    public Server(String id, String url, int weight) {
         this.id = id;
-        this.host = host;
-        this.port = port;
-        this.url = "http://" + host + ":" + port;
+        this.url = url;
         this.healthy = true;
-        this.weight = 1; // 기본 가중치
+        this.weight = weight;
         this.currentConnections = new AtomicInteger(0);
         this.totalRequests = new AtomicLong(0);
         this.recentResponseTimes = new LinkedList<>();
     }
-    
+
     // 연결 수 관리
     public void incrementConnections() {
         currentConnections.incrementAndGet();
         totalRequests.incrementAndGet();
     }
-    
+
     public void decrementConnections() {
-        currentConnections.decrementAndGet();
+        currentConnections.updateAndGet(v -> v > 0 ? v - 1 : 0);
     }
-    
+
+    public boolean tryIncrementConnections(int expected) {
+        boolean success = currentConnections.compareAndSet(expected, expected + 1);
+        if (success) {
+            totalRequests.incrementAndGet();
+        }
+        return success;
+    }
+
     // 응답시간 기록
     public void recordResponseTime(long responseTime) {
         synchronized (responseTimeLock) {
             recentResponseTimes.offer(responseTime);
-            // 최근 10개만 유지
             if (recentResponseTimes.size() > 10) {
                 recentResponseTimes.poll();
             }
         }
     }
-    
+
     // 평균 응답시간 계산
     public double getAverageResponseTime() {
         synchronized (responseTimeLock) {
             if (recentResponseTimes.isEmpty()) {
-                return Double.MAX_VALUE; // 데이터 없으면 최악으로 간주
+                return Double.MAX_VALUE;
             }
             return recentResponseTimes.stream()
                     .mapToLong(Long::longValue)
@@ -76,20 +78,20 @@ public class Server {
         }
     }
 
-    public boolean tryIncrementConnections(int expected) {
-        return connections.compareAndSet(expected, expected + 1);
+    public int getCurrentConnections() {
+        return currentConnections.get();
     }
 
-
-    public int getCurrentConnections() { return currentConnections.get(); }
-    public long getTotalRequests() { return totalRequests.get(); }
+    public long getTotalRequests() {
+        return totalRequests.get();
+    }
 
     @Override
     public String toString() {
-        return String.format("Server{id='%s', url='%s', healthy=%s, connections=%d, avgResponseTime=%.2fms}", 
-                id, url, healthy, getCurrentConnections(), getAverageResponseTime());
+        return String.format("Server{id='%s', url='%s', healthy=%s, weight=%d, connections=%d}",
+                id, url, healthy, weight, getCurrentConnections());
     }
-    
+
     @Override
     public boolean equals(Object obj) {
         if (this == obj) return true;
@@ -97,7 +99,7 @@ public class Server {
         Server server = (Server) obj;
         return id.equals(server.id);
     }
-    
+
     @Override
     public int hashCode() {
         return id.hashCode();

@@ -2,9 +2,13 @@ package dgu.loadBalancing.strategy;
 
 import dgu.loadBalancing.model.Server;
 import org.springframework.stereotype.Component;
+
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.*;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -14,7 +18,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  */
 @Component("consistentHashing")
 public class ConsistentHashingStrategy implements LoadBalancingStrategy {
-    
+
     private static final int VIRTUAL_NODES = 150; // 가상 노드 수 (핫스팟 방지)
     private static final ThreadLocal<MessageDigest> MD5_HOLDER = ThreadLocal.withInitial(() -> {
         try {
@@ -50,7 +54,9 @@ public class ConsistentHashingStrategy implements LoadBalancingStrategy {
         Map.Entry<Long, Server> entry = currentRing.ceilingEntry(clientHash);
         if (entry == null) entry = currentRing.firstEntry();
 
-        return entry.getValue();
+        Server selected = entry.getValue();
+        selected.incrementConnections();  // 이거 추가
+        return selected;
     }
 
     private synchronized void rebuildIfNeeded(List<Server> servers) {
@@ -63,34 +69,34 @@ public class ConsistentHashingStrategy implements LoadBalancingStrategy {
     @Override
     public void updateServerMetrics(Server server, long responseTime, boolean success) {
         server.decrementConnections();
-        
+
         if (success) {
             server.recordResponseTime(responseTime);
         }
     }
-    
+
     @Override
     public String getStrategyName() {
         return "Consistent Hashing";
     }
-    
+
     @Override
     public String getDescription() {
         return "Consistent Hashing - 해시 링을 사용하여 클라이언트를 서버에 일관되게 매핑";
     }
-    
+
     @Override
     public void onServerAdded(Server server) {
         if (server.isHealthy()) {
             addServerToRing(server);
         }
     }
-    
+
     @Override
     public void onServerRemoved(Server server) {
         removeServerFromRing(server);
     }
-    
+
     /**
      * 해시 링 구성
      */
@@ -126,7 +132,7 @@ public class ConsistentHashingStrategy implements LoadBalancingStrategy {
             hashRing.put(hash, server);
         }
     }
-    
+
     /**
      * 서버를 해시 링에서 제거
      */
@@ -137,7 +143,7 @@ public class ConsistentHashingStrategy implements LoadBalancingStrategy {
             hashRing.remove(hash);
         }
     }
-    
+
     /**
      * 해시 링 재구성이 필요한지 확인
      */
@@ -145,12 +151,12 @@ public class ConsistentHashingStrategy implements LoadBalancingStrategy {
         Set<Server> healthyServers = new HashSet<>(servers.stream()
                 .filter(Server::isHealthy)
                 .toList());
-        
+
         Set<Server> ringServers = new HashSet<>(hashRing.values());
-        
+
         return !healthyServers.equals(ringServers);
     }
-    
+
     /**
      * 문자열의 MD5 해시값을 long으로 변환
      */
@@ -167,60 +173,6 @@ public class ConsistentHashingStrategy implements LoadBalancingStrategy {
         }
         return Math.abs(hash);
     }
-    
-    /**
-     * 클라이언트가 매핑될 서버 예측 (실제 연결 증가 없이)
-     */
-    public Server predictServer(List<Server> servers, String clientInfo) {
-        if (!ringInitialized || needsRebuild(servers)) {
-            buildHashRing(servers);
-        }
-        
-        if (hashRing.isEmpty()) {
-            return null;
-        }
-        
-        long clientHash = hash(clientInfo);
-        Map.Entry<Long, Server> entry = hashRing.ceilingEntry(clientHash);
-        if (entry == null) {
-            entry = hashRing.firstEntry();
-        }
-        
-        return entry.getValue();
-    }
-    
-    /**
-     * 해시 링의 현재 상태 반환 (디버깅용)
-     */
-    public Map<String, Integer> getRingDistribution() {
-        Map<String, Integer> distribution = new HashMap<>();
-        
-        for (Server server : hashRing.values()) {
-            distribution.merge(server.getId(), 1, Integer::sum);
-        }
-        
-        return distribution;
-    }
-    
-    /**
-     * 해시 링 크기 반환 (테스트용)
-     */
-    public int getRingSize() {
-        return hashRing.size();
-    }
-    
-    /**
-     * 클라이언트 해시값 반환 (테스트용)
-     */
-    public long getClientHash(String clientInfo) {
-        return hash(clientInfo);
-    }
-    
-    /**
-     * 해시 링 초기화 (테스트용)
-     */
-    public void clearRing() {
-        hashRing.clear();
-        ringInitialized = false;
-    }
+
+
 }

@@ -50,18 +50,5 @@ public class RoundRobinStrategy implements LoadBalancingStrategy {
     public String getDescription() {
         return "Round Robin - 서버를 순차적으로 선택하는 기본 알고리즘";
     }
-    
-    /**
-     * 현재 인덱스를 리셋 (테스트용)
-     */
-    public void reset() {
-        currentIndex.set(0);
-    }
-    
-    /**
-     * 현재 인덱스 반환 (모니터링용)
-     */
-    public int getCurrentIndex() {
-        return currentIndex.get();
-    }
+
 }
