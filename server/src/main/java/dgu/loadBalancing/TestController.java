@@ -1,5 +1,7 @@
 package dgu.loadBalancing;
 
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -8,6 +10,23 @@ import java.util.Map;
 
 @RestController
 public class TestController {
+
+    @Value("${SERVER_ID:unknown}")
+    private String serverId;
+
+    @Value("${RESPONSE_DELAY:0}")
+    private int delay;
+
+    @GetMapping("/test")
+    public ResponseEntity<String> test() throws InterruptedException {
+        Thread.sleep(delay);
+
+        return ResponseEntity.ok(
+                "Response from " + serverId +
+                        " (delay=" + delay + "ms)");
+        }
+
+
 
     @GetMapping("/")
     public Map<String, Object> home() {

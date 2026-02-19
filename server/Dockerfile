@@ -1,5 +1,5 @@
 # 빌드 스테이지
-FROM openjdk:17-jdk-slim AS builder
+FROM eclipse-temurin:21-jdk AS builder
 
 WORKDIR /app
 
@@ -17,8 +17,8 @@ RUN ./gradlew dependencies --no-daemon
 COPY src src
 RUN ./gradlew clean build -x test --no-daemon
 
-# 런타임 스테이지 - Eclipse Temurin 사용 (OpenJDK 기반)
-FROM eclipse-temurin:17-jre
+# 런타임 스테이지
+FROM eclipse-temurin:21-jre
 
 WORKDIR /app
 
