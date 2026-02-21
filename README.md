@@ -31,7 +31,7 @@
 
 | 분류 | 기술 |
 |------|------|
-| 로드밸런서 | Spring Boot, Java 17, WebClient |
+| 로드밸런서 | Spring Boot, Java 21, WebClient |
 | 백엔드 서버 | Docker Compose (4개 컨테이너) |
 | 부하 테스트 | K6 |
 | 모니터링 | Prometheus, Grafana, Micrometer |
