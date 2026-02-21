@@ -1,11 +1,5 @@
 # 🚀 로드밸런싱 구현 및 부하테스트 
 
-
-
-![Java](https://img.shields.io/badge/Java-17-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
-![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.2-6DB33F?style=for-the-badge&logo=spring-boot&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
-
 # ⚖️ Load Balancer — 6가지 알고리즘 구현 및 성능 비교 분석
 
 > 6가지 로드밸런싱 알고리즘을 직접 구현하고, 3가지 시나리오에서 체계적으로 성능을 비교한 프로젝트
