@@ -1,6 +1,9 @@
 package com.alb.proxy;
 
 import com.alb.algorithm.AlgorithmType;
+import com.alb.engine.DecisionEngine;
+import com.alb.engine.DecisionLog;
+import com.alb.engine.DecisionResult;
 import com.alb.metrics.MetricsCollector;
 import com.alb.metrics.MetricsExporter;
 import com.alb.metrics.MetricsSnapshot;
@@ -10,13 +13,11 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
 
 import java.io.IOException;
@@ -41,9 +42,11 @@ public class RequestProxy {
     private final ServerPool serverPool;
     private final MetricsCollector metricsCollector;
     private final MetricsExporter metricsExporter;
+    private final DecisionEngine decisionEngine;
+    private final DecisionLog decisionLog;
     private final WebClient webClient;
 
-    @Value("${alb.mode:PROXY}")
+    @Value("${alb.mode:SIMULATE}")
     private String mode;
 
     @Value("${alb.timeout-seconds:10}")
@@ -52,10 +55,14 @@ public class RequestProxy {
     public RequestProxy(ServerPool serverPool,
                         MetricsCollector metricsCollector,
                         MetricsExporter metricsExporter,
+                        DecisionEngine decisionEngine,
+                        DecisionLog decisionLog,
                         WebClient.Builder webClientBuilder) {
         this.serverPool = serverPool;
         this.metricsCollector = metricsCollector;
         this.metricsExporter = metricsExporter;
+        this.decisionEngine = decisionEngine;
+        this.decisionLog = decisionLog;
         this.webClient = webClientBuilder.build();
     }
 
@@ -98,6 +105,32 @@ public class RequestProxy {
     public Map<String, String> exportMetrics() throws IOException {
         String path = metricsExporter.exportToJson();
         return Map.of("file", path);
+    }
+
+    @GetMapping("/alb/decisions")
+    public List<DecisionResult> decisions(@RequestParam(defaultValue = "20") int last) {
+        return decisionLog.getLast(last);
+    }
+
+    @GetMapping("/alb/state")
+    public Map<String, Object> engineState() {
+        return Map.of(
+                "currentState", decisionEngine.getCurrentState(),
+                "currentAlgorithm", serverPool.getCurrentAlgorithmType(),
+                "rules", decisionEngine.getRules().entrySet().stream()
+                        .map(e -> Map.of(
+                                "state", e.getKey(),
+                                "algorithm", e.getValue().getAlgorithm(),
+                                "confidenceThreshold", e.getValue().getConfidenceThreshold(),
+                                "description", e.getValue().getDescription()
+                        )).toList()
+        );
+    }
+
+    @PostMapping("/alb/rules/reload")
+    public Map<String, String> reloadRules() {
+        decisionEngine.reloadRules();
+        return Map.of("status", "Rules reloaded");
     }
 
     // ── Proxy handler ────────────────────────────────────────────────────────────

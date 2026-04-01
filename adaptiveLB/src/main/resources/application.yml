@@ -6,8 +6,7 @@ spring:
     name: adaptive-load-balancer
 
 alb:
-  # Starting algorithm (ROUND_ROBIN | WEIGHTED_ROUND_ROBIN | LEAST_CONNECTIONS |
-  #                      WEIGHTED_LEAST_CONNECTIONS | IP_HASH | RANDOM)
+  # Starting algorithm (overridden at runtime by DecisionEngine)
   algorithm: ROUND_ROBIN
 
   # PROXY: forward requests to real backend servers
@@ -19,6 +18,43 @@ alb:
   metrics:
     window-size-seconds: 10
     max-windows: 10
+
+  # Backend server pool (used in SIMULATE and PROXY modes)
+  servers:
+    - id: server-1
+      url: http://localhost:5001
+      weight: 3
+      simulated-latency-ms: 50
+      error-rate: 0.01
+    - id: server-2
+      url: http://localhost:5002
+      weight: 2
+      simulated-latency-ms: 100
+      error-rate: 0.02
+    - id: server-3
+      url: http://localhost:5003
+      weight: 1
+      simulated-latency-ms: 200
+      error-rate: 0.05
+
+  # Pattern analyzer thresholds
+  analyzer:
+    low-rps-threshold: 5.0
+    spike-rps-derivative-threshold: 1.0
+    gradual-rps-derivative-threshold: 0.3
+    latency-trend-windows: 3
+    latency-rising-slope: 20.0
+    server-error-rate-threshold: 0.1
+    server-latency-threshold: 500.0
+    min-snapshots-required: 2
+
+  # Algorithm switch guard policy
+  switch-policy:
+    cooldown-seconds: 10
+    min-confidence: 0.6
+    max-switches-per-minute: 3
+    sustained-windows: 3
+    spike-sustained-windows: 2
 
 management:
   endpoints:

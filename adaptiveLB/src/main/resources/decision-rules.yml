@@ -1,0 +1,32 @@
+rules:
+  - state: SPIKE
+    algorithm: LEAST_CONNECTIONS
+    confidence_threshold: 0.8
+    description: "RPS 급증 시 연결 수 기반 분배가 latency 안정화에 효과적"
+
+  - state: HIGH_STABLE
+    algorithm: ROUND_ROBIN
+    confidence_threshold: 0.6
+    description: "안정적 트래픽에서는 단순 분배가 오버헤드 최소"
+
+  - state: OVERLOADED_NODE
+    algorithm: WEIGHTED_LEAST_CONNECTIONS
+    confidence_threshold: 0.9
+    description: "특정 노드 과부하 시 가중치 기반으로 부하 회피"
+
+  - state: LOW_TRAFFIC
+    algorithm: ROUND_ROBIN
+    confidence_threshold: 0.5
+    description: "저트래픽에서는 알고리즘 차이 미미"
+
+  - state: GRADUAL_INCREASE
+    algorithm: WEIGHTED_ROUND_ROBIN
+    confidence_threshold: 0.7
+    description: "점진적 증가 시 가중치로 서버 capacity 반영"
+
+switch_policy:
+  cooldown_seconds: 10
+  min_confidence: 0.6
+  max_switches_per_minute: 3
+  sustained_windows: 3
+  spike_sustained_windows: 2
