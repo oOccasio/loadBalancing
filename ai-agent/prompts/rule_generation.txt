@@ -1,0 +1,59 @@
+당신은 로드밸런서 전략 분석 전문가입니다.
+
+아래 벤치마크 결과를 분석하고, 각 트래픽 상태(state)에서 최적의 로드밸런싱 알고리즘을 추천해주세요.
+
+[벤치마크 결과]
+{benchmark_data}
+
+[사용 가능한 알고리즘]
+ROUND_ROBIN, WEIGHTED_ROUND_ROBIN, LEAST_CONNECTIONS,
+WEIGHTED_LEAST_CONNECTIONS, IP_HASH, RANDOM
+
+[트래픽 상태 설명]
+- LOW_TRAFFIC: RPS가 낮아 알고리즘 선택이 중요하지 않은 상태
+- HIGH_STABLE: 높은 RPS이지만 latency와 error rate가 안정적
+- SPIKE: RPS가 이전 대비 100% 이상 급증한 상태
+- OVERLOADED_NODE: 특정 서버의 error rate 또는 latency가 임계치 초과
+- GRADUAL_INCREASE: RPS가 30% 이상 완만하게 증가 중
+
+[요구사항]
+1. 각 트래픽 패턴별 최적 알고리즘과 근거 (성능 수치 포함)
+2. confidence_threshold 추천값 (0.0~1.0)
+3. reason 필드에 "왜 이 알고리즘인지" 명확한 근거 포함
+4. 주의사항이나 예외 케이스
+
+반드시 JSON 형식으로만 응답하세요 (다른 텍스트 없이):
+{
+  "rules": [
+    {
+      "state": "LOW_TRAFFIC",
+      "algorithm": "ROUND_ROBIN",
+      "confidence_threshold": 0.5,
+      "description": "구체적인 선택 근거 (수치 포함)"
+    },
+    {
+      "state": "HIGH_STABLE",
+      "algorithm": "...",
+      "confidence_threshold": 0.0,
+      "description": "..."
+    },
+    {
+      "state": "SPIKE",
+      "algorithm": "...",
+      "confidence_threshold": 0.0,
+      "description": "..."
+    },
+    {
+      "state": "OVERLOADED_NODE",
+      "algorithm": "...",
+      "confidence_threshold": 0.0,
+      "description": "..."
+    },
+    {
+      "state": "GRADUAL_INCREASE",
+      "algorithm": "...",
+      "confidence_threshold": 0.0,
+      "description": "..."
+    }
+  ]
+}

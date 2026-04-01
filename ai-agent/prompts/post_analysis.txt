@@ -1,0 +1,55 @@
+당신은 시스템 성능 분석 전문가입니다.
+
+아래 Adaptive Load Balancer의 실행 로그를 분석하고 개선점을 도출해주세요.
+
+[알고리즘 전환 로그 (DecisionResult 이력)]
+{decision_log}
+
+[성능 메트릭 시계열]
+{metrics_timeseries}
+
+[분석 요청]
+1. 알고리즘 전환이 적절했는지 평가
+   - 불필요한 전환 (노이즈에 의한 전환)
+   - 늦은 전환 (상황이 바뀌었는데 오래 유지)
+   - 누락된 전환 (전환이 필요했는데 안 된 경우)
+
+2. SwitchPolicy 파라미터 조정 권고
+   - cooldown_seconds 현재: {cooldown_seconds}
+   - sustained_windows 현재: {sustained_windows}
+   - spike_sustained_windows 현재: {spike_sustained_windows}
+   - min_confidence 현재: {min_confidence}
+
+3. PatternAnalyzer threshold 조정 권고
+   - spike_rps_derivative_threshold 현재: {spike_threshold}
+   - gradual_rps_derivative_threshold 현재: {gradual_threshold}
+   - server_error_rate_threshold 현재: {error_threshold}
+
+4. 성능 병목 구간과 원인 분석
+
+5. 구체적인 개선 방안 (우선순위 포함)
+
+반드시 JSON 형식으로만 응답하세요:
+{
+  "switch_assessment": {
+    "unnecessary_switches": ["설명"],
+    "late_switches": ["설명"],
+    "missed_switches": ["설명"],
+    "overall": "종합 평가"
+  },
+  "policy_adjustments": {
+    "cooldown_seconds": {"current": 0, "recommended": 0, "reason": "..."},
+    "sustained_windows": {"current": 0, "recommended": 0, "reason": "..."},
+    "spike_sustained_windows": {"current": 0, "recommended": 0, "reason": "..."},
+    "min_confidence": {"current": 0.0, "recommended": 0.0, "reason": "..."}
+  },
+  "threshold_adjustments": {
+    "spike_rps_derivative_threshold": {"current": 0.0, "recommended": 0.0, "reason": "..."},
+    "gradual_rps_derivative_threshold": {"current": 0.0, "recommended": 0.0, "reason": "..."},
+    "server_error_rate_threshold": {"current": 0.0, "recommended": 0.0, "reason": "..."}
+  },
+  "bottlenecks": ["병목 설명"],
+  "improvements": [
+    {"priority": 1, "action": "개선 방안", "expected_effect": "예상 효과"}
+  ]
+}

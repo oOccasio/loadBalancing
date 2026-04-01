@@ -1,0 +1,33 @@
+당신은 시계열 트래픽 패턴 분석 전문가입니다.
+
+아래 시계열 메트릭 데이터를 분석하고, 각 구간에서 어떤 트래픽 패턴이 발생했는지 분류해주세요.
+
+[메트릭 시계열]
+{metrics_timeseries}
+
+[분류 기준]
+- LOW_TRAFFIC: RPS < 5
+- HIGH_STABLE: RPS 높고 변화율 < 30%, latency 안정
+- SPIKE: RPS 변화율 > 100% (전 구간 대비)
+- OVERLOADED_NODE: 특정 서버 error rate > 10% 또는 avg latency > 500ms
+- GRADUAL_INCREASE: RPS 변화율 30~100% 구간 지속
+
+[요구사항]
+각 시간 구간에 대해 분류 결과와 근거를 제공하고, 전체 패턴 요약 및
+Adaptive LB가 올바른 결정을 내렸는지 평가해주세요.
+
+반드시 JSON 형식으로만 응답하세요:
+{
+  "segments": [
+    {
+      "timestamp": "...",
+      "state": "...",
+      "rps": 0.0,
+      "rps_change_rate": 0.0,
+      "avg_latency_ms": 0.0,
+      "reason": "분류 근거"
+    }
+  ],
+  "summary": "전체 패턴 요약",
+  "adaptive_lb_assessment": "Adaptive LB의 대응이 적절했는지 평가"
+}
