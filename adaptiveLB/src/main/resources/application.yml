@@ -1,0 +1,34 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: adaptive-load-balancer
+
+alb:
+  # Starting algorithm (ROUND_ROBIN | WEIGHTED_ROUND_ROBIN | LEAST_CONNECTIONS |
+  #                      WEIGHTED_LEAST_CONNECTIONS | IP_HASH | RANDOM)
+  algorithm: ROUND_ROBIN
+
+  # PROXY: forward requests to real backend servers
+  # SIMULATE: return synthetic response using per-server latency/error-rate config
+  mode: SIMULATE
+
+  timeout-seconds: 10
+
+  metrics:
+    window-size-seconds: 10
+    max-windows: 10
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.alb: DEBUG
