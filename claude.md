@@ -438,4 +438,4 @@ README는 이 흐름으로 구성:
 - 알고리즘 전환은 SwitchPolicy를 반드시 거친다
 - MetricsCollector의 sliding window 크기는 설정 가능하게
 - 모든 벤치마크 결과는 JSON으로 저장하여 재현 가능하게
-- AI Agent 분석 결과도 로그로 남긴다 (어떤 입력 → 어떤 출력)
+- AI Agent 분석 결과도 로그로 남긴다 (어떤 입력 → 어떤 출력):
