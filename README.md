@@ -1,11 +1,5 @@
 # 🚀 로드밸런싱 구현 및 부하테스트 
 
-
-
-![Java](https://img.shields.io/badge/Java-17-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
-![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.2-6DB33F?style=for-the-badge&logo=spring-boot&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
-
 # ⚖️ Load Balancer — 6가지 알고리즘 구현 및 성능 비교 분석
 
 > 6가지 로드밸런싱 알고리즘을 직접 구현하고, 3가지 시나리오에서 체계적으로 성능을 비교한 프로젝트
@@ -25,26 +19,13 @@
 ---
 
 ## 🏗️ 시스템 아키텍처
-
-```
-[K6 부하 테스트] ──→ [Spring Boot 로드밸런서 :8080]
-                              │
-                    ┌─────────┼─────────┐
-                    ▼         ▼         ▼         ▼
-              [server-1] [server-2] [server-3] [server-4]
-               :5001      :5002      :5003      :5004
-               50ms       150ms      300ms      500ms
-                    │         │         │         │
-                    └─────────┴─────────┴─────────┘
-                              │
-                    [Prometheus :9090] ──→ [Grafana :3000]
-```
+![아키텍처](https://i.imgur.com/GxWs35d.png)
 
 ## 🛠️ 기술 스택
 
 | 분류 | 기술 |
 |------|------|
-| 로드밸런서 | Spring Boot, Java 17, WebClient |
+| 로드밸런서 | Spring Boot, Java 21, WebClient |
 | 백엔드 서버 | Docker Compose (4개 컨테이너) |
 | 부하 테스트 | K6 |
 | 모니터링 | Prometheus, Grafana, Micrometer |
