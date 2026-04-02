@@ -103,5 +103,7 @@ def _print_recommendations(result: dict):
 
     policy = result.get("policy_adjustments", {})
     for key, val in policy.items():
+        if not isinstance(val, dict):
+            continue
         if val.get("current") != val.get("recommended"):
             print(f"  Adjust {key}: {val['current']} → {val['recommended']} ({val.get('reason', '')})")
