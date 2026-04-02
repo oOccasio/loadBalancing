@@ -35,3 +35,9 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### ALB project ###
+benchmark/results/
+ai-agent/.env
+ai-agent/logs/
+config/

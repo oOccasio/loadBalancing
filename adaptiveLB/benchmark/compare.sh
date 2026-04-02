@@ -40,7 +40,15 @@ run_scenario() {
     local scenario="$1"
     local label="$2"
     local out="${RESULTS_DIR}/${scenario}-${label}.json"
-    local script="$(dirname "$0")/scenarios/${scenario}.js"
+    local script_map
+    case "$scenario" in
+        stable)           script_map="stable-traffic" ;;
+        spike)            script_map="spike-traffic" ;;
+        gradual-increase) script_map="gradual-increase" ;;
+        hotspot)          script_map="hotspot-traffic" ;;
+        *)                script_map="$scenario" ;;
+    esac
+    local script="$(dirname "$0")/scenarios/${script_map}.js"
 
     if [[ ! -f "$script" ]]; then
         log "ERROR: scenario script not found: $script"
@@ -50,7 +58,7 @@ run_scenario() {
     log "Running ${scenario} [${label}] → ${out}"
     k6 run \
         --env TARGET_URL="${TARGET_URL}" \
-        --summary-export="${out}" \
+        --env LABEL="${label}" \
         --out "json=${out%.json}-raw.json" \
         "$script" 2>&1 | tee "${out%.json}.log"
 
@@ -69,8 +77,9 @@ run_all_fixed() {
     for algo in "${ALGORITHMS[@]}"; do
         switch_algorithm "$algo"
         sleep 2
-        run_scenario "$scenario" "fixed-${algo,,}"
-        export_metrics "${scenario}-fixed-${algo,,}"
+        algo_lower=$(echo "$algo" | tr '[:upper:]' '[:lower:]')
+        run_scenario "$scenario" "fixed-${algo_lower}"
+        export_metrics "${scenario}-fixed-${algo_lower}"
         sleep 3
     done
 }
@@ -140,27 +149,31 @@ check_alb_running() {
     log "ALB is running at ${TARGET_URL}"
 }
 
-run_scenario_suite() {
-    local scenario="$1"
-    check_alb_running
-    run_all_fixed "$scenario"
-    run_adaptive "$scenario"
-    summarise "$scenario"
-}
 
-case "$SCENARIO" in
-    all)
-        for s in stable spike gradual-increase hotspot; do
-            run_scenario_suite "$s"
-        done
-        ;;
-    stable|spike|gradual-increase|hotspot)
-        run_scenario_suite "$SCENARIO"
-        ;;
-    *)
-        echo "Usage: $0 [stable|spike|gradual-increase|hotspot|all] [target_url]"
-        exit 1
-        ;;
-esac
+VALID="stable spike gradual-increase hotspot"
+
+check_alb_running
+
+# comma-separated list or keywords
+if [[ "$SCENARIO" == "all" ]]; then
+    SCENARIOS_TO_RUN="stable spike gradual-increase hotspot"
+elif [[ "$SCENARIO" == *","* ]]; then
+    SCENARIOS_TO_RUN="${SCENARIO//,/ }"
+elif echo "$VALID" | grep -qw "$SCENARIO"; then
+    SCENARIOS_TO_RUN="$SCENARIO"
+else
+    echo "Usage: $0 [stable|spike|gradual-increase|hotspot|all|stable,spike|...] [target_url]"
+    exit 1
+fi
+
+for s in $SCENARIOS_TO_RUN; do
+    if ! echo "$VALID" | grep -qw "$s"; then
+        log "Unknown scenario: $s — skipping"
+        continue
+    fi
+    run_all_fixed "$s"
+    run_adaptive "$s"
+    summarise "$s"
+done
 
 log "Benchmark complete. Results in ${RESULTS_DIR}/"
