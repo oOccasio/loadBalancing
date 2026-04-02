@@ -30,7 +30,7 @@ export const options = {
 const BASE_URL = __ENV.TARGET_URL || 'http://localhost:8081';
 
 export default function () {
-    const res = http.get(`${BASE_URL}/bench`);
+    const res = http.get(`${BASE_URL}/`);
 
     latency.add(res.timings.duration);
     errorRate.add(res.status >= 400 || res.status === 0);

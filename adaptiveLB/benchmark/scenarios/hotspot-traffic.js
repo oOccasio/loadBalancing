@@ -51,7 +51,7 @@ export default function () {
         ? STICKY_IPS[__VU % STICKY_IPS.length]
         : `192.168.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`;
 
-    const res = http.get(`${BASE_URL}/bench`, {
+    const res = http.get(`${BASE_URL}/`, {
         headers: { 'X-Forwarded-For': ip },
     });
 
