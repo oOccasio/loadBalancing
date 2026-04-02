@@ -11,7 +11,7 @@ alb:
 
   # PROXY: forward requests to real backend servers
   # SIMULATE: return synthetic response using per-server latency/error-rate config
-  mode: SIMULATE
+  mode: PROXY
 
   timeout-seconds: 10
 
@@ -19,23 +19,28 @@ alb:
     window-size-seconds: 10
     max-windows: 10
 
-  # Backend server pool (used in SIMULATE and PROXY modes)
+  # Backend server pool — matches Docker-compose.yml in /server
   servers:
     - id: server-1
       url: http://localhost:5001
-      weight: 3
-      simulated-latency-ms: 50
-      error-rate: 0.01
+      weight: 4
+      simulated-latency-ms: 5
+      error-rate: 0.0
     - id: server-2
       url: http://localhost:5002
-      weight: 2
-      simulated-latency-ms: 100
-      error-rate: 0.02
+      weight: 3
+      simulated-latency-ms: 10
+      error-rate: 0.0
     - id: server-3
       url: http://localhost:5003
+      weight: 2
+      simulated-latency-ms: 15
+      error-rate: 0.0
+    - id: server-4
+      url: http://localhost:5004
       weight: 1
-      simulated-latency-ms: 200
-      error-rate: 0.05
+      simulated-latency-ms: 20
+      error-rate: 0.0
 
   # Pattern analyzer thresholds
   analyzer:
