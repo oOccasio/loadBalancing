@@ -61,16 +61,18 @@ public class SwitchPolicy {
 
         // Cooldown gate
         if (Duration.between(lastSwitchTime, Instant.now()).getSeconds() < cooldownSeconds) {
+            resetPending();
             return false;
         }
 
         // Rate-limit gate
         purgeOldSwitches();
         if (recentSwitches.size() >= maxSwitchesPerMinute) {
+            resetPending();
             return false;
         }
 
-        // Hysteresis gate: new state must be observed consecutively
+        // Hysteresis
         if (newState.equals(pendingState)) {
             consecutiveCount++;
         } else {
@@ -78,7 +80,10 @@ public class SwitchPolicy {
             consecutiveCount = 1;
         }
 
-        int required = (newState == TrafficState.SPIKE) ? spikeSustainedWindows : sustainedWindows;
+        int required = (newState == TrafficState.SPIKE)
+                ? spikeSustainedWindows
+                : sustainedWindows;
+
         return consecutiveCount >= required;
     }
 

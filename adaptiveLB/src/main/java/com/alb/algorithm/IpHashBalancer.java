@@ -34,12 +34,12 @@ public class IpHashBalancer implements LoadBalancer {
         if (ip == null || ip.isBlank()) return 0;
         String[] parts = ip.split("\\.");
         if (parts.length == 4) {
-            int hash = 0;
             try {
+                long hash = 0;
                 for (String part : parts) {
                     hash = hash * 256 + Integer.parseInt(part);
                 }
-                return hash;
+                return (int) (hash & Integer.MAX_VALUE);
             } catch (NumberFormatException ignored) {
             }
         }

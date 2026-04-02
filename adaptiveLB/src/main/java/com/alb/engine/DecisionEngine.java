@@ -6,6 +6,7 @@ import com.alb.analyzer.TrafficState;
 import com.alb.metrics.MetricsCollector;
 import com.alb.metrics.MetricsSnapshot;
 import com.alb.server.ServerPool;
+import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -37,6 +38,8 @@ public class DecisionEngine {
     private volatile Map<TrafficState, DecisionRule> rules;
     private volatile TrafficState currentState = TrafficState.LOW_TRAFFIC;
 
+
+
     public DecisionEngine(MetricsCollector metricsCollector,
                           PatternAnalyzer patternAnalyzer,
                           RuleConfigLoader ruleConfigLoader,
@@ -49,6 +52,15 @@ public class DecisionEngine {
         this.switchPolicy = switchPolicy;
         this.serverPool = serverPool;
         this.decisionLog = decisionLog;
+    }
+
+    @PostConstruct
+    public void init() {
+        this.rules = ruleConfigLoader.load();
+    }
+
+    @Scheduled(fixedDelay = 5000)
+    public void reload() {
         this.rules = ruleConfigLoader.load();
     }
 
@@ -68,7 +80,8 @@ public class DecisionEngine {
         TrafficState newState = analysis.state();
         double confidence = analysis.confidence();
         DecisionRule rule = rules.getOrDefault(newState,
-                rules.get(TrafficState.LOW_TRAFFIC));
+                rules.getOrDefault(TrafficState.LOW_TRAFFIC,
+                        new DecisionRule(TrafficState.LOW_TRAFFIC, AlgorithmType.ROUND_ROBIN, 0.5, "Default fallback")));
 
         AlgorithmType currentAlgo = serverPool.getCurrentAlgorithmType();
         boolean switched = false;
@@ -93,10 +106,8 @@ public class DecisionEngine {
                 String.format("%.2f", confidence), switched, truncate(reason, 120));
     }
 
-    /** Hot-reload rules from the YAML file (called after AI agent updates the config). */
-    public void reloadRules() {
-        rules = ruleConfigLoader.load();
-        log.info("Decision rules reloaded: {} rules", rules.size());
+    public void reloadRulesManual() {
+        this.rules = ruleConfigLoader.load();
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────────

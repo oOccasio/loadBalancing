@@ -129,7 +129,7 @@ public class RequestProxy {
 
     @PostMapping("/alb/rules/reload")
     public Map<String, String> reloadRules() {
-        decisionEngine.reloadRules();
+        decisionEngine.reloadRulesManual();
         return Map.of("status", "Rules reloaded");
     }
 
@@ -149,16 +149,22 @@ public class RequestProxy {
             return ResponseEntity.status(503).body("No healthy server available".getBytes());
         }
 
-        server.incrementConnections();
         long start = System.currentTimeMillis();
         boolean success = true;
+        ResponseEntity<byte[]> response;
 
         try {
             if ("SIMULATE".equalsIgnoreCase(mode)) {
-                return simulateResponse(server, start, clientIp);
+                response = simulateResponse(server, start, clientIp);
             } else {
-                return forwardRequest(request, server, body, start, clientIp);
+                response = forwardRequest(request, server, body, start, clientIp);
             }
+
+            int status = response.getStatusCode().value();
+            success = status >= 200 && status < 400;
+
+            return response;
+
         } catch (Exception e) {
             success = false;
             log.error("Request to {} failed: {}", server.getId(), e.getMessage());
@@ -167,9 +173,6 @@ public class RequestProxy {
             long latency = System.currentTimeMillis() - start;
             serverPool.onRequestComplete(server, latency, success);
             metricsCollector.record(server.getId(), latency, success);
-            log.debug("[{}] {} {} -> {} latency={}ms success={}",
-                    serverPool.getCurrentAlgorithmType(), request.getMethod(),
-                    request.getRequestURI(), server.getId(), latency, success);
         }
     }
 
@@ -206,7 +209,15 @@ public class RequestProxy {
                 .timeout(Duration.ofSeconds(timeoutSeconds))
                 .block();
 
-        return response != null ? response : ResponseEntity.status(502).build();
+        if (response == null) return ResponseEntity.status(502).build();
+
+        org.springframework.http.HttpHeaders filteredHeaders = new org.springframework.http.HttpHeaders();
+        response.getHeaders().forEach((name, values) -> {
+            if (!name.equalsIgnoreCase("transfer-encoding")) {
+                filteredHeaders.put(name, values);
+            }
+        });
+        return new ResponseEntity<>(response.getBody(), filteredHeaders, response.getStatusCode());
     }
 
     private ResponseEntity<byte[]> simulateResponse(BackendServer server, long start, String clientIp) throws InterruptedException {

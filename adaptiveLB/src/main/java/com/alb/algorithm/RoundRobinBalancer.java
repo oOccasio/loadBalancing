@@ -13,7 +13,7 @@ public class RoundRobinBalancer implements LoadBalancer {
     public BackendServer select(List<BackendServer> servers, String clientInfo) {
         List<BackendServer> healthy = servers.stream().filter(BackendServer::isHealthy).toList();
         if (healthy.isEmpty()) return null;
-        return healthy.get(Math.abs(index.getAndIncrement() % healthy.size()));
+        return healthy.get(Math.floorMod(index.getAndIncrement(), healthy.size()));
     }
 
     @Override

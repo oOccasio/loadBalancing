@@ -8,6 +8,7 @@ import com.alb.server.ServerPool;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.util.concurrent.atomic.AtomicInteger;
@@ -35,7 +36,7 @@ public class PrometheusMetricsPublisher {
     private final DecisionEngine decisionEngine;
 
     private final AtomicInteger switchCount = new AtomicInteger(0);
-    private AlgorithmType lastAlgorithm;
+    private volatile AlgorithmType lastAlgorithm;
 
     public PrometheusMetricsPublisher(MeterRegistry registry,
                                       MetricsCollector metricsCollector,
@@ -98,16 +99,18 @@ public class PrometheusMetricsPublisher {
 
         // ── Algorithm switch counter ──────────────────────────────────────────
 
-        Gauge.builder("alb_algorithm_switches_total", this, p -> {
-                    AlgorithmType current = serverPool.getCurrentAlgorithmType();
-                    if (lastAlgorithm != null && current != lastAlgorithm) {
-                        switchCount.incrementAndGet();
-                    }
-                    lastAlgorithm = current;
-                    return switchCount.get();
-                })
+        Gauge.builder("alb_algorithm_switches_total", switchCount, AtomicInteger::get)
                 .description("Cumulative number of algorithm switches")
                 .register(registry);
+    }
+
+    @Scheduled(fixedDelay = 1000)
+    public void trackAlgorithmSwitch() {
+        AlgorithmType current = serverPool.getCurrentAlgorithmType();
+        if (lastAlgorithm != null && current != lastAlgorithm) {
+            switchCount.incrementAndGet();
+        }
+        lastAlgorithm = current;
     }
 
     private MetricsSnapshot latestSnapshot() {

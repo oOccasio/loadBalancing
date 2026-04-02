@@ -10,7 +10,7 @@ public class BackendServer {
     private final String id;
     private final String url;
     private volatile boolean healthy = true;
-    private int weight;
+    private volatile int weight;
 
     // Simulation config (artificial latency/error for testing without real backends)
     private volatile long simulatedLatencyMs = 0;
@@ -41,11 +41,10 @@ public class BackendServer {
 
     public void incrementConnections() {
         activeConnections.incrementAndGet();
-        totalRequests.incrementAndGet();
     }
 
     public void decrementConnections() {
-        activeConnections.decrementAndGet();
+        activeConnections.updateAndGet(v -> Math.max(0, v - 1));
     }
 
     public boolean tryIncrementConnections(int expected) {
@@ -53,6 +52,7 @@ public class BackendServer {
     }
 
     public void recordResponse(long latencyMs, boolean success) {
+        totalRequests.incrementAndGet();
         totalLatencyMs.addAndGet(latencyMs);
         if (!success) {
             errorCount.incrementAndGet();

@@ -11,6 +11,8 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -26,19 +28,26 @@ import java.util.Map;
 public class RuleConfigLoader {
 
     private static final Logger log = LoggerFactory.getLogger(RuleConfigLoader.class);
-    private static final String CONFIG_FILE = "decision-rules.yml";
+    private static final String CONFIG_FILE = "./config/decision-rules.yml";
 
     private final ObjectMapper yaml = new ObjectMapper(new YAMLFactory());
 
     public Map<TrafficState, DecisionRule> load() {
         try {
-            ClassPathResource resource = new ClassPathResource(CONFIG_FILE);
-            if (resource.exists()) {
-                return parseYaml(resource.getInputStream());
+            Path path = Path.of(CONFIG_FILE);
+
+            if (Files.exists(path)) {
+                try (InputStream is = Files.newInputStream(path)) {
+                    return parseYaml(is);
+                }
+            } else {
+                log.warn("{} not found. Using defaults.", CONFIG_FILE);
             }
+
         } catch (IOException e) {
             log.warn("Failed to load {}: {}. Using defaults.", CONFIG_FILE, e.getMessage());
         }
+
         return buildDefaults();
     }
 
@@ -47,6 +56,10 @@ public class RuleConfigLoader {
         Map<String, Object> root = yaml.readValue(is, Map.class);
         List<Map<String, Object>> rules = (List<Map<String, Object>>) root.get("rules");
 
+        if (rules == null) {
+            log.warn("No 'rules' key found in {}. Using defaults.", CONFIG_FILE);
+            return buildDefaults();
+        }
         Map<TrafficState, DecisionRule> result = new EnumMap<>(TrafficState.class);
         for (Map<String, Object> r : rules) {
             TrafficState state = TrafficState.valueOf((String) r.get("state"));
