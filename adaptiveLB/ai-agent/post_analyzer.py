@@ -6,6 +6,7 @@ post-experiment analysis. Produces recommendations for threshold and policy tuni
 import json
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 from openai import OpenAI
 
@@ -26,7 +27,7 @@ _DEFAULT_POLICY = {
 
 
 def run_post_analysis(decision_log: list, metrics_snapshots: list,
-                      policy: dict | None = None) -> dict:
+                      policy: Optional[dict] = None) -> dict:
     """
     Analyse decision history and metrics, return GPT-4o recommendations.
     """

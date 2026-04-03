@@ -41,3 +41,4 @@ benchmark/results/
 ai-agent/.env
 ai-agent/logs/
 config/
+!ai-agent/rule_versions/

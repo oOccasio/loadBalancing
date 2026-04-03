@@ -11,6 +11,7 @@ import argparse
 import json
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 import yaml
 from openai import OpenAI
@@ -29,7 +30,7 @@ def load_version(version: str) -> dict:
         return yaml.safe_load(f)
 
 
-def diff_versions(old_ver: str, new_ver: str, benchmark_data: dict | None = None) -> str:
+def diff_versions(old_ver: str, new_ver: str, benchmark_data: Optional[dict] = None) -> str:
     """
     Compare two rule versions with GPT-4o and produce a markdown diff document.
     Returns the path to the generated diff file.

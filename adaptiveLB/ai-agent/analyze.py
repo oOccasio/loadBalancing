@@ -15,6 +15,7 @@ import json
 import os
 import sys
 from pathlib import Path
+from typing import Union
 
 from dotenv import load_dotenv
 
@@ -25,7 +26,7 @@ from rule_generator import generate_rules
 load_dotenv()
 
 
-def load_json(path: str) -> dict | list:
+def load_json(path: str) -> Union[dict, list]:
     with open(path, encoding="utf-8") as f:
         return json.load(f)
 
@@ -40,7 +41,7 @@ def collect_benchmark_files(path: str) -> list[Path]:
     p = Path(path)
     if p.is_file():
         return [p]
-    return sorted(p.glob("*.json"))
+    return sorted(f for f in p.glob("*.json") if not f.name.endswith("-raw.json"))
 
 
 def main():
